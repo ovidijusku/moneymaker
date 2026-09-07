@@ -95,12 +95,8 @@ async def test_poll_bars_uses_lookback_when_one_symbol_has_no_history(
 async def test_poll_bars_is_idempotent_across_runs(factory: SessionFactory) -> None:
     client = FakeBarsClient([FakeAlpacaBar(timestamp=NOW)])
 
-    first = await poll_bars(
-        factory, client, symbols=["BTC/USD"], lookback=timedelta(hours=2)
-    )
-    second = await poll_bars(
-        factory, client, symbols=["BTC/USD"], lookback=timedelta(hours=2)
-    )
+    first = await poll_bars(factory, client, symbols=["BTC/USD"], lookback=timedelta(hours=2))
+    second = await poll_bars(factory, client, symbols=["BTC/USD"], lookback=timedelta(hours=2))
 
     assert (first, second) == (1, 0)
     async with factory() as session:
@@ -110,21 +106,14 @@ async def test_poll_bars_is_idempotent_across_runs(factory: SessionFactory) -> N
 async def test_poll_bars_survives_upstream_failure(factory: SessionFactory) -> None:
     client = FakeBarsClient(error=RuntimeError("alpaca down"))
 
-    assert (
-        await poll_bars(
-            factory, client, symbols=["BTC/USD"], lookback=timedelta(hours=2)
-        )
-        == 0
-    )
+    assert await poll_bars(factory, client, symbols=["BTC/USD"], lookback=timedelta(hours=2)) == 0
 
 
 async def test_poll_news_stores_events_from_all_feeds(factory: SessionFactory) -> None:
     transport = httpx.MockTransport(lambda _: httpx.Response(200, content=FEED_XML))
 
     async with httpx.AsyncClient(transport=transport) as client:
-        stored = await poll_news(
-            factory, client, feeds=["https://a.example"], universe=["BTC/USD"]
-        )
+        stored = await poll_news(factory, client, feeds=["https://a.example"], universe=["BTC/USD"])
 
     assert stored == 1
 

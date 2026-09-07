@@ -27,6 +27,10 @@ def normalise_symbol(value: str) -> str:
     return symbol
 
 
+def clamp(value: float, low: float = -1.0, high: float = 1.0) -> float:
+    return max(low, min(high, value))
+
+
 UtcDatetime = Annotated[datetime, AfterValidator(to_utc)]
 Symbol = Annotated[str, AfterValidator(normalise_symbol)]
 
