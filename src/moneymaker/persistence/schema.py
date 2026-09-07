@@ -70,3 +70,19 @@ class SentimentRow(Base):
     polarity: Mapped[float] = mapped_column()
     confidence: Mapped[float] = mapped_column(default=0.0)
     scored_at: Mapped[datetime] = mapped_column(UtcTimestamp)
+
+
+class AdviceRow(Base):
+    """The advice journal. Keyed on the bar it was derived from, so re-running
+    the job never rewrites history -- the first opinion recorded stands."""
+
+    __tablename__ = "advice"
+
+    symbol: Mapped[str] = mapped_column(String(32), primary_key=True)
+    timestamp: Mapped[datetime] = mapped_column(UtcTimestamp, primary_key=True)
+    direction: Mapped[str] = mapped_column(String(8))
+    conviction: Mapped[float] = mapped_column(default=0.0)
+    rationale: Mapped[str] = mapped_column(String, default="")
+    signals: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
+
+    __table_args__ = (Index("ix_advice_timestamp", "timestamp"),)

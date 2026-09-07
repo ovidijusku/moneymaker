@@ -201,6 +201,10 @@ def test_scheduler_registers_market_and_news_jobs() -> None:
     assert {"bars", "news"} <= _job_ids(None)
 
 
+def test_scheduler_always_registers_the_advice_job() -> None:
+    assert "advice" in _job_ids(None)
+
+
 def test_scheduler_skips_social_job_without_reddit_client() -> None:
     assert "social" not in _job_ids(None)
 

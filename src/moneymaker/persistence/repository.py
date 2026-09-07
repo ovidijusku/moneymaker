@@ -15,14 +15,24 @@ from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from moneymaker.domain import Bar, NewsEvent, SentimentScore, SocialPost
-from moneymaker.persistence.schema import BarRow, NewsRow, SentimentRow, SocialRow
+from moneymaker.domain import (
+    Advice,
+    Bar,
+    ContentSource,
+    Direction,
+    NewsEvent,
+    SentimentScore,
+    Signal,
+    SocialPost,
+)
+from moneymaker.persistence.schema import AdviceRow, BarRow, NewsRow, SentimentRow, SocialRow
 
 # DeclarativeBase types __table__ as FromClause; the dialect inserts need Table.
 BAR_TABLE: Final[Table] = cast(Table, BarRow.__table__)
 NEWS_TABLE: Final[Table] = cast(Table, NewsRow.__table__)
 SOCIAL_TABLE: Final[Table] = cast(Table, SocialRow.__table__)
 SENTIMENT_TABLE: Final[Table] = cast(Table, SentimentRow.__table__)
+ADVICE_TABLE: Final[Table] = cast(Table, AdviceRow.__table__)
 
 
 def _insert_ignore(dialect: str, table: Table, rows: Sequence[dict[str, Any]]) -> Insert:
@@ -94,6 +104,17 @@ def _sentiment_values(score: SentimentScore) -> dict[str, Any]:
     }
 
 
+def _advice_values(advice: Advice) -> dict[str, Any]:
+    return {
+        "symbol": advice.symbol,
+        "timestamp": advice.timestamp,
+        "direction": advice.direction.value,
+        "conviction": advice.conviction,
+        "rationale": advice.rationale,
+        "signals": [signal.model_dump(mode="json") for signal in advice.signals],
+    }
+
+
 async def store_bars(session: AsyncSession, bars: Sequence[Bar]) -> int:
     return await _store(session, BAR_TABLE, [_bar_values(bar) for bar in bars])
 
@@ -108,6 +129,10 @@ async def store_posts(session: AsyncSession, posts: Sequence[SocialPost]) -> int
 
 async def store_sentiment(session: AsyncSession, scores: Sequence[SentimentScore]) -> int:
     return await _store(session, SENTIMENT_TABLE, [_sentiment_values(score) for score in scores])
+
+
+async def store_advice(session: AsyncSession, advice: Sequence[Advice]) -> int:
+    return await _store(session, ADVICE_TABLE, [_advice_values(item) for item in advice])
 
 
 async def latest_bar_timestamp(session: AsyncSession, symbol: str) -> datetime | None:
@@ -141,6 +166,110 @@ async def load_bars(
             volume=row.volume,
             trade_count=row.trade_count,
             vwap=row.vwap,
+        )
+        for row in result.scalars()
+    )
+
+
+async def load_news(
+    session: AsyncSession,
+    *,
+    since: datetime | None = None,
+) -> tuple[NewsEvent, ...]:
+    """All feeds at once. Symbol tags live in a JSON column, and filtering those
+    in SQL is dialect-specific, so callers narrow by symbol in Python."""
+    statement = select(NewsRow)
+    if since is not None:
+        statement = statement.where(NewsRow.published_at >= since)
+    result = await session.execute(statement.order_by(NewsRow.published_at))
+    return tuple(
+        NewsEvent(
+            id=row.id,
+            source=ContentSource(row.source),
+            feed=row.feed,
+            url=row.url,
+            title=row.title,
+            body=row.body,
+            published_at=row.published_at,
+            fetched_at=row.fetched_at,
+            symbols=frozenset(row.symbols),
+        )
+        for row in result.scalars()
+    )
+
+
+async def load_posts(
+    session: AsyncSession,
+    *,
+    since: datetime | None = None,
+) -> tuple[SocialPost, ...]:
+    statement = select(SocialRow)
+    if since is not None:
+        statement = statement.where(SocialRow.created_at >= since)
+    result = await session.execute(statement.order_by(SocialRow.created_at))
+    return tuple(
+        SocialPost(
+            id=row.id,
+            source=ContentSource(row.source),
+            author=row.author,
+            url=row.url,
+            body=row.body,
+            created_at=row.created_at,
+            fetched_at=row.fetched_at,
+            score=row.score,
+            author_weight=row.author_weight,
+            symbols=frozenset(row.symbols),
+        )
+        for row in result.scalars()
+    )
+
+
+async def load_sentiment(
+    session: AsyncSession,
+    content_ids: Sequence[str],
+    *,
+    model: str,
+) -> dict[str, SentimentScore]:
+    """Cached scores keyed by content id, so text is never scored twice."""
+    if not content_ids:
+        return {}
+    statement = select(SentimentRow).where(
+        SentimentRow.model == model,
+        SentimentRow.content_id.in_(content_ids),
+    )
+    result = await session.execute(statement)
+    return {
+        row.content_id: SentimentScore(
+            content_id=row.content_id,
+            model=row.model,
+            polarity=row.polarity,
+            confidence=row.confidence,
+            scored_at=row.scored_at,
+        )
+        for row in result.scalars()
+    }
+
+
+async def load_advice(
+    session: AsyncSession,
+    *,
+    symbol: str | None = None,
+    since: datetime | None = None,
+) -> tuple[Advice, ...]:
+    statement = select(AdviceRow)
+    if symbol is not None:
+        statement = statement.where(AdviceRow.symbol == symbol)
+    if since is not None:
+        statement = statement.where(AdviceRow.timestamp >= since)
+    result = await session.execute(statement.order_by(AdviceRow.timestamp))
+    return tuple(
+        Advice(
+            symbol=row.symbol,
+            timestamp=row.timestamp,
+            direction=Direction(row.direction),
+            conviction=row.conviction,
+            rationale=row.rationale,
+            signals=tuple(Signal.model_validate(signal) for signal in row.signals),
         )
         for row in result.scalars()
     )

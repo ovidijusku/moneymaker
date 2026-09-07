@@ -15,6 +15,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from moneymaker.clients import create_bars_client, create_http_client, create_reddit
 from moneymaker.config import Settings
 from moneymaker.persistence import create_engine, create_schema, create_session_factory
+from moneymaker.pipeline.advice import poll_advice
 from moneymaker.pipeline.jobs import SessionFactory, poll_bars, poll_news, poll_social
 
 log = structlog.get_logger(__name__)
@@ -78,6 +79,13 @@ def build_scheduler(
             id="social",
             **defaults,
         )
+    scheduler.add_job(
+        partial(poll_advice, factory, symbols=settings.symbols),
+        "interval",
+        seconds=settings.advice_poll_seconds,
+        id="advice",
+        **defaults,
+    )
     return scheduler
 
 

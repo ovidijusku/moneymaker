@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     bar_poll_seconds: int = Field(default=60, ge=5)
     news_poll_seconds: int = Field(default=300, ge=30)
     social_poll_seconds: int = Field(default=300, ge=30)
+    advice_poll_seconds: int = Field(default=300, ge=30)
     backfill_lookback_hours: int = Field(default=24, ge=1)
 
     @property

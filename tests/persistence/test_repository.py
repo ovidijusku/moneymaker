@@ -9,10 +9,14 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from moneymaker.domain import (
+    Advice,
     Bar,
     ContentSource,
+    Direction,
     NewsEvent,
     SentimentScore,
+    Signal,
+    SignalSource,
     SocialPost,
     content_id,
 )
@@ -21,7 +25,12 @@ from moneymaker.persistence import (
     create_schema,
     create_session_factory,
     latest_bar_timestamp,
+    load_advice,
     load_bars,
+    load_news,
+    load_posts,
+    load_sentiment,
+    store_advice,
     store_bars,
     store_news,
     store_posts,
@@ -170,3 +179,140 @@ async def test_unsupported_dialect_is_rejected() -> None:
 
     with pytest.raises(NotImplementedError, match="mysql"):
         _insert_ignore("mysql", BAR_TABLE, [{"symbol": "BTC/USD"}])
+
+
+def make_news(event_id: str = "n1", minute: int = 0) -> NewsEvent:
+    return NewsEvent(
+        id=event_id,
+        feed="coindesk",
+        url=f"https://example.com/{event_id}",
+        title="Bitcoin rallies",
+        published_at=NOW + timedelta(minutes=minute),
+        fetched_at=NOW,
+        symbols=frozenset({"BTC/USD"}),
+    )
+
+
+def make_post(post_id: str = "p1", minute: int = 0) -> SocialPost:
+    return SocialPost(
+        id=post_id,
+        source=ContentSource.REDDIT,
+        author="whale",
+        url=f"https://reddit.com/r/x/{post_id}",
+        body="accumulating",
+        created_at=NOW + timedelta(minutes=minute),
+        fetched_at=NOW,
+        author_weight=0.8,
+        symbols=frozenset({"BTC/USD"}),
+    )
+
+
+def make_advice(minute: int = 0, symbol: str = "BTC/USD") -> Advice:
+    return Advice(
+        symbol=symbol,
+        timestamp=NOW + timedelta(minutes=minute),
+        direction=Direction.BUY,
+        conviction=0.42,
+        rationale="trend and news agree",
+        signals=(
+            Signal(
+                symbol=symbol,
+                timestamp=NOW + timedelta(minutes=minute),
+                source=SignalSource.TECHNICAL,
+                name="trend_ema",
+                value=0.5,
+                weight=0.6,
+                evidence=("ema_spread=0.01",),
+            ),
+        ),
+    )
+
+
+async def test_load_news_filters_by_publication_window(session: AsyncSession) -> None:
+    await store_news(session, [make_news("old", -60), make_news("new", 0)])
+
+    recent = await load_news(session, since=NOW - timedelta(minutes=10))
+
+    assert [event.id for event in recent] == ["new"]
+    assert recent[0].symbols == frozenset({"BTC/USD"})
+
+
+async def test_load_news_without_a_window_returns_everything(session: AsyncSession) -> None:
+    await store_news(session, [make_news("a", -60), make_news("b", 0)])
+
+    assert len(await load_news(session)) == 2
+
+
+async def test_load_posts_preserves_author_weight(session: AsyncSession) -> None:
+    await store_posts(session, [make_post()])
+
+    posts = await load_posts(session, since=NOW - timedelta(minutes=1))
+
+    assert posts[0].author_weight == 0.8
+    assert posts[0].source is ContentSource.REDDIT
+
+
+async def test_load_sentiment_returns_a_cache_keyed_by_content_id(
+    session: AsyncSession,
+) -> None:
+    await store_sentiment(
+        session,
+        [
+            SentimentScore(
+                content_id="abc", model="lex", polarity=0.4, confidence=0.9, scored_at=NOW
+            )
+        ],
+    )
+
+    cache = await load_sentiment(session, ["abc", "missing"], model="lex")
+
+    assert set(cache) == {"abc"}
+    assert cache["abc"].polarity == 0.4
+
+
+async def test_load_sentiment_ignores_other_models(session: AsyncSession) -> None:
+    await store_sentiment(
+        session,
+        [
+            SentimentScore(
+                content_id="abc", model="lex", polarity=0.4, confidence=0.9, scored_at=NOW
+            )
+        ],
+    )
+
+    assert await load_sentiment(session, ["abc"], model="finbert") == {}
+
+
+async def test_load_sentiment_short_circuits_on_empty_input(session: AsyncSession) -> None:
+    assert await load_sentiment(session, [], model="lex") == {}
+
+
+async def test_store_advice_round_trips_its_signals(session: AsyncSession) -> None:
+    await store_advice(session, [make_advice()])
+
+    stored = await load_advice(session)
+
+    assert stored == (make_advice(),)
+    assert stored[0].signals[0].evidence == ("ema_spread=0.01",)
+
+
+async def test_store_advice_keeps_the_first_opinion_for_a_bar(session: AsyncSession) -> None:
+    await store_advice(session, [make_advice()])
+
+    assert await store_advice(session, [make_advice()]) == 0
+    assert len(await load_advice(session)) == 1
+
+
+async def test_store_advice_ignores_empty_input(session: AsyncSession) -> None:
+    assert await store_advice(session, []) == 0
+
+
+async def test_load_advice_filters_by_symbol_and_window(session: AsyncSession) -> None:
+    await store_advice(
+        session,
+        [make_advice(0), make_advice(5), make_advice(0, symbol="ETH/USD")],
+    )
+
+    stored = await load_advice(session, symbol="BTC/USD", since=NOW + timedelta(minutes=1))
+
+    assert [item.timestamp for item in stored] == [NOW + timedelta(minutes=5)]

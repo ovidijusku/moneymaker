@@ -8,16 +8,19 @@ from moneymaker.strategy.content import (
     news_items,
     social_items,
 )
+from moneymaker.strategy.evaluate import StrategyConfig, evaluate
 from moneymaker.strategy.technical import TechnicalConfig, technical_signals
 
 __all__ = [
     "CompositeConfig",
     "ContentConfig",
     "ScoredItem",
+    "StrategyConfig",
     "TechnicalConfig",
     "aggregate_sentiment",
     "blend",
     "build_advice",
+    "evaluate",
     "news_items",
     "social_items",
     "technical_signals",
