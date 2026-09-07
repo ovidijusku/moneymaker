@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
@@ -8,26 +7,9 @@ from typing import Any
 import pytest
 
 from moneymaker.ingest.alpaca_bars import backfill, to_bar, to_bars
+from tests.fakes import FakeAlpacaBar, FakeBarSet
 
 START = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
-
-
-@dataclass
-class FakeAlpacaBar:
-    symbol: str = "BTC/USD"
-    timestamp: datetime = START
-    open: float = 100.1
-    high: float = 110.0
-    low: float = 90.0
-    close: float = 105.0
-    volume: float = 3.5
-    trade_count: float | None = 12.0
-    vwap: float | None = 101.25
-
-
-@dataclass
-class FakeBarSet:
-    data: dict[str, list[FakeAlpacaBar]]
 
 
 class FakeClient:

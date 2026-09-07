@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from enum import StrEnum
 from functools import lru_cache
 
@@ -38,6 +39,10 @@ class Settings(BaseSettings):
     reddit_client_id: SecretStr | None = None
     reddit_client_secret: SecretStr | None = None
     reddit_user_agent: str = "moneymaker/0.1"
+    reddit_subreddits: tuple[str, ...] = ("CryptoCurrency", "CryptoMarkets", "Bitcoin")
+    reddit_post_limit: int = Field(default=50, ge=1, le=100)
+    #: Curated allowlist; unlisted authors score 0 and contribute nothing.
+    reddit_author_weights: dict[str, float] = Field(default_factory=dict)
 
     # X/Twitter read access is paid and its ToS forbids scraping; off by default.
     enable_x: bool = False
@@ -49,6 +54,20 @@ class Settings(BaseSettings):
 
     #: Must be set to True explicitly before real capital is ever at risk.
     acknowledge_live_trading_risk: bool = Field(default=False)
+
+    bar_poll_seconds: int = Field(default=60, ge=5)
+    news_poll_seconds: int = Field(default=300, ge=30)
+    social_poll_seconds: int = Field(default=300, ge=30)
+    backfill_lookback_hours: int = Field(default=24, ge=1)
+
+    @property
+    def backfill_lookback(self) -> timedelta:
+        return timedelta(hours=self.backfill_lookback_hours)
+
+    @field_validator("reddit_author_weights")
+    @classmethod
+    def normalise_author_keys(cls, value: dict[str, float]) -> dict[str, float]:
+        return {author.lower(): weight for author, weight in value.items()}
 
     @field_validator("symbols", "rss_feeds")
     @classmethod

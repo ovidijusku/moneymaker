@@ -1,43 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
 
 from moneymaker.domain import ContentSource
 from moneymaker.ingest.reddit import fetch_subreddit, parse_submissions, to_social_post
+from tests.fakes import CREATED, FakeReddit, FakeSubmission
 
 NOW = datetime(2026, 1, 2, 9, 0, tzinfo=UTC)
-CREATED = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
-
-
-@dataclass
-class FakeSubmission:
-    id: str = "abc123"
-    title: str = "Bitcoin looks strong"
-    selftext: str = "accumulating here"
-    permalink: str = "/r/CryptoCurrency/comments/abc123/"
-    score: int = 120
-    created_utc: float = CREATED.timestamp()
-    author: Any = "WhaleWatcher"
-
-
-class FakeListing:
-    def __init__(self, submissions: list[FakeSubmission]) -> None:
-        self._submissions = submissions
-
-    def new(self, limit: int) -> list[FakeSubmission]:
-        return self._submissions[:limit]
-
-
-class FakeReddit:
-    def __init__(self, submissions: list[FakeSubmission]) -> None:
-        self._submissions = submissions
-        self.requested: list[str] = []
-
-    def subreddit(self, name: str) -> FakeListing:
-        self.requested.append(name)
-        return FakeListing(self._submissions)
 
 
 def test_maps_submission_to_social_post() -> None:

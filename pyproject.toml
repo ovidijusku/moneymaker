@@ -72,6 +72,9 @@ ignore = ["A003"]
 # SQLAlchemy dictates the TypeDecorator override signature, `dialect` included.
 "src/moneymaker/persistence/types.py" = ["ARG002"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["moneymaker", "tests"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
@@ -79,12 +82,13 @@ warn_unreachable = true
 files = ["src", "tests"]
 
 [[tool.mypy.overrides]]
-module = ["feedparser.*", "praw.*", "talipp.*", "alpaca.*"]
+module = ["alpaca.*", "apscheduler.*", "feedparser.*", "praw.*", "talipp.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "--cov=moneymaker --cov-report=term-missing --cov-fail-under=80 -q"
 
 [tool.coverage.run]
