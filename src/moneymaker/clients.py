@@ -6,6 +6,7 @@ from typing import Any
 
 import httpx
 from alpaca.data.historical import CryptoHistoricalDataClient
+from alpaca.trading.client import TradingClient
 
 from moneymaker.config import Settings
 from moneymaker.ingest.rss import USER_AGENT
@@ -17,6 +18,15 @@ def create_bars_client(settings: Settings) -> CryptoHistoricalDataClient:
     return CryptoHistoricalDataClient(
         api_key=settings.alpaca_api_key.get_secret_value(),
         secret_key=settings.alpaca_api_secret.get_secret_value(),
+    )
+
+
+def create_trading_client(settings: Settings) -> TradingClient:
+    """Used read-only, for account and position state. This project submits no orders."""
+    return TradingClient(
+        api_key=settings.alpaca_api_key.get_secret_value(),
+        secret_key=settings.alpaca_api_secret.get_secret_value(),
+        paper=settings.alpaca_paper,
     )
 
 

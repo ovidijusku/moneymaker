@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/usepolling.ts","./src/components/advicecard.tsx","./src/components/newslist.tsx","./src/components/pricechart.tsx","./vite.config.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/usepolling.ts","./src/components/advicecard.tsx","./src/components/eventstream.tsx","./src/components/pricechart.tsx","./src/components/tradeplanpanel.tsx","./vite.config.ts"],"version":"5.9.3"}

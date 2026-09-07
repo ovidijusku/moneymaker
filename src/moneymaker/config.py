@@ -9,6 +9,9 @@ from functools import lru_cache
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from moneymaker.strategy.plan import RiskConfig
+from moneymaker.universe import DEFAULT_SYMBOLS
+
 
 class TradingMode(StrEnum):
     ADVISORY = "advisory"
@@ -33,7 +36,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/moneymaker.db"
     log_level: str = "INFO"
 
-    symbols: tuple[str, ...] = ("BTC/USD", "ETH/USD")
+    symbols: tuple[str, ...] = DEFAULT_SYMBOLS
 
     enable_reddit: bool = False
     reddit_client_id: SecretStr | None = None
@@ -59,7 +62,25 @@ class Settings(BaseSettings):
     news_poll_seconds: int = Field(default=300, ge=30)
     social_poll_seconds: int = Field(default=300, ge=30)
     advice_poll_seconds: int = Field(default=300, ge=30)
+    portfolio_poll_seconds: int = Field(default=120, ge=30)
     backfill_lookback_hours: int = Field(default=24, ge=1)
+
+    #: Fraction of equity risked per suggestion, i.e. the loss if the stop trades.
+    risk_per_trade: float = Field(default=0.005, gt=0.0, le=0.05)
+    max_position_pct: float = Field(default=0.10, gt=0.0, le=1.0)
+    max_gross_exposure_pct: float = Field(default=0.60, gt=0.0, le=1.0)
+    stop_atr_multiple: float = Field(default=2.0, gt=0.0)
+    target_atr_multiple: float = Field(default=3.0, gt=0.0)
+
+    @property
+    def risk_config(self) -> RiskConfig:
+        return RiskConfig(
+            risk_per_trade=self.risk_per_trade,
+            max_position_pct=self.max_position_pct,
+            max_gross_exposure_pct=self.max_gross_exposure_pct,
+            stop_atr_multiple=self.stop_atr_multiple,
+            target_atr_multiple=self.target_atr_multiple,
+        )
 
     @property
     def backfill_lookback(self) -> timedelta:

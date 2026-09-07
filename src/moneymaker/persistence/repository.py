@@ -6,7 +6,7 @@ replaying a backfill is idempotent.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from datetime import datetime
 from typing import Any, Final, cast
 
@@ -21,11 +21,20 @@ from moneymaker.domain import (
     ContentSource,
     Direction,
     NewsEvent,
+    Portfolio,
+    Position,
     SentimentScore,
     Signal,
     SocialPost,
 )
-from moneymaker.persistence.schema import AdviceRow, BarRow, NewsRow, SentimentRow, SocialRow
+from moneymaker.persistence.schema import (
+    AdviceRow,
+    BarRow,
+    NewsRow,
+    PortfolioRow,
+    SentimentRow,
+    SocialRow,
+)
 
 # DeclarativeBase types __table__ as FromClause; the dialect inserts need Table.
 BAR_TABLE: Final[Table] = cast(Table, BarRow.__table__)
@@ -33,6 +42,7 @@ NEWS_TABLE: Final[Table] = cast(Table, NewsRow.__table__)
 SOCIAL_TABLE: Final[Table] = cast(Table, SocialRow.__table__)
 SENTIMENT_TABLE: Final[Table] = cast(Table, SentimentRow.__table__)
 ADVICE_TABLE: Final[Table] = cast(Table, AdviceRow.__table__)
+PORTFOLIO_TABLE: Final[Table] = cast(Table, PortfolioRow.__table__)
 
 
 def _insert_ignore(dialect: str, table: Table, rows: Sequence[dict[str, Any]]) -> Insert:
@@ -43,12 +53,27 @@ def _insert_ignore(dialect: str, table: Table, rows: Sequence[dict[str, Any]]) -
     raise NotImplementedError(f"insert-ignore is not implemented for dialect {dialect!r}")
 
 
+#: Postgres refuses a statement with more than 32767 bind parameters, and each
+#: row spends one per column. A backfill across the full universe is tens of
+#: thousands of bars, so a single INSERT is not an option.
+MAX_BIND_PARAMS: Final[int] = 30000
+
+
+def _chunk(table: Table, rows: Sequence[dict[str, Any]]) -> Iterator[Sequence[dict[str, Any]]]:
+    size = max(1, MAX_BIND_PARAMS // max(len(table.columns), 1))
+    for start in range(0, len(rows), size):
+        yield rows[start : start + size]
+
+
 async def _store(session: AsyncSession, table: Table, rows: Sequence[dict[str, Any]]) -> int:
     if not rows:
         return 0
     dialect = session.get_bind().dialect.name
-    result = await session.execute(_insert_ignore(dialect, table, rows))
-    return int(cast(CursorResult[Any], result).rowcount)
+    stored = 0
+    for batch in _chunk(table, rows):
+        result = await session.execute(_insert_ignore(dialect, table, batch))
+        stored += int(cast(CursorResult[Any], result).rowcount)
+    return stored
 
 
 def _bar_values(bar: Bar) -> dict[str, Any]:
@@ -115,6 +140,15 @@ def _advice_values(advice: Advice) -> dict[str, Any]:
     }
 
 
+def _portfolio_values(portfolio: Portfolio) -> dict[str, Any]:
+    return {
+        "timestamp": portfolio.timestamp,
+        "equity": portfolio.equity,
+        "cash": portfolio.cash,
+        "positions": [position.model_dump(mode="json") for position in portfolio.positions],
+    }
+
+
 async def store_bars(session: AsyncSession, bars: Sequence[Bar]) -> int:
     return await _store(session, BAR_TABLE, [_bar_values(bar) for bar in bars])
 
@@ -133,6 +167,24 @@ async def store_sentiment(session: AsyncSession, scores: Sequence[SentimentScore
 
 async def store_advice(session: AsyncSession, advice: Sequence[Advice]) -> int:
     return await _store(session, ADVICE_TABLE, [_advice_values(item) for item in advice])
+
+
+async def store_portfolio(session: AsyncSession, portfolio: Portfolio) -> int:
+    return await _store(session, PORTFOLIO_TABLE, [_portfolio_values(portfolio)])
+
+
+async def latest_portfolio(session: AsyncSession) -> Portfolio | None:
+    statement = select(PortfolioRow).order_by(PortfolioRow.timestamp.desc()).limit(1)
+    result = await session.execute(statement)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+    return Portfolio(
+        timestamp=row.timestamp,
+        equity=row.equity,
+        cash=row.cash,
+        positions=tuple(Position.model_validate(item) for item in row.positions),
+    )
 
 
 async def latest_bar_timestamp(session: AsyncSession, symbol: str) -> datetime | None:

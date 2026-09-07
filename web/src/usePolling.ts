@@ -15,6 +15,9 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs: number, dep
 
   useEffect(() => {
     let active = true;
+    // Dropping the old value matters when deps change: showing the previous
+    // symbol's trade plan next to a new symbol's name would be actively wrong.
+    setState({ data: null, error: null, loading: true });
 
     const load = async () => {
       try {
@@ -22,11 +25,11 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs: number, dep
         if (active) setState({ data, error: null, loading: false });
       } catch (error) {
         if (active) {
-          setState((previous) => ({
-            ...previous,
+          setState({
+            data: null,
             error: error instanceof Error ? error.message : "request failed",
             loading: false,
-          }));
+          });
         }
       }
     };

@@ -8,6 +8,7 @@ from moneymaker.domain.content import (
     content_id,
 )
 from moneymaker.domain.market import Bar, Quote
+from moneymaker.domain.portfolio import Portfolio, Position
 from moneymaker.domain.signals import Advice, Direction, Signal, SignalSource
 
 __all__ = [
@@ -16,6 +17,8 @@ __all__ = [
     "ContentSource",
     "Direction",
     "NewsEvent",
+    "Portfolio",
+    "Position",
     "Quote",
     "SentimentScore",
     "Signal",

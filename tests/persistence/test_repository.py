@@ -86,6 +86,15 @@ async def test_store_bars_ignores_empty_input(session: AsyncSession) -> None:
     assert await store_bars(session, []) == 0
 
 
+async def test_store_bars_survives_a_full_universe_backfill(session: AsyncSession) -> None:
+    """One statement per write blew past Postgres' 32767 bind-parameter cap once
+    the universe grew to 32 symbols, so writes have to be chunked."""
+    bars = [make_bar(minute) for minute in range(6000)]
+
+    assert await store_bars(session, bars) == 6000
+    assert len(await load_bars(session, "BTC/USD")) == 6000
+
+
 async def test_load_bars_filters_by_window_and_orders_ascending(
     session: AsyncSession,
 ) -> None:

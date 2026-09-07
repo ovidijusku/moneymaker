@@ -86,3 +86,14 @@ class AdviceRow(Base):
     signals: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)
 
     __table_args__ = (Index("ix_advice_timestamp", "timestamp"),)
+
+
+class PortfolioRow(Base):
+    """Account snapshots. Keeping the history is what makes an equity curve possible."""
+
+    __tablename__ = "portfolio_snapshots"
+
+    timestamp: Mapped[datetime] = mapped_column(UtcTimestamp, primary_key=True)
+    equity: Mapped[Decimal] = mapped_column(ExactDecimal)
+    cash: Mapped[Decimal] = mapped_column(ExactDecimal)
+    positions: Mapped[list[dict[str, object]]] = mapped_column(JSON, default=list)

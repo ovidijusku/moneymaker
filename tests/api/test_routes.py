@@ -9,8 +9,16 @@ import pytest_asyncio
 from asgi_lifespan import LifespanManager
 
 from moneymaker.api import create_app
-from moneymaker.domain import Advice, Bar, Direction, NewsEvent, Signal, SignalSource
-from moneymaker.persistence import store_advice, store_bars, store_news
+from moneymaker.domain import (
+    Advice,
+    Bar,
+    Direction,
+    NewsEvent,
+    Portfolio,
+    Signal,
+    SignalSource,
+)
+from moneymaker.persistence import store_advice, store_bars, store_news, store_portfolio
 from tests.test_config import make_settings
 
 NOW = datetime.now(tz=UTC)
@@ -81,6 +89,36 @@ async def seed(client: httpx.AsyncClient) -> None:
         await session.commit()
 
 
+async def seed_history(client: httpx.AsyncClient) -> None:
+    """Enough bars to warm up every indicator, with a drifting close."""
+    factory = client.app.state.session_factory  # type: ignore[attr-defined]
+    bars = [
+        Bar(
+            symbol="BTC/USD",
+            timestamp=NOW - timedelta(minutes=60 - n),
+            open=Decimal(100 + n),
+            high=Decimal(102 + n),
+            low=Decimal(98 + n),
+            close=Decimal(101 + n),
+            volume=Decimal("5"),
+        )
+        for n in range(60)
+    ]
+    async with factory() as session:
+        await store_bars(session, bars)
+        await session.commit()
+
+
+async def seed_portfolio(client: httpx.AsyncClient) -> None:
+    factory = client.app.state.session_factory  # type: ignore[attr-defined]
+    async with factory() as session:
+        await store_portfolio(
+            session,
+            Portfolio(timestamp=NOW, equity=Decimal("100000"), cash=Decimal("100000")),
+        )
+        await session.commit()
+
+
 async def test_health_reports_ok(client: httpx.AsyncClient) -> None:
     response = await client.get("/api/health")
 
@@ -148,3 +186,84 @@ async def test_news_filters_by_symbol_tag(client: httpx.AsyncClient) -> None:
 async def test_lookback_window_is_bounded(client: httpx.AsyncClient) -> None:
     assert (await client.get("/api/advice", params={"hours": 10_000})).status_code == 422
     assert (await client.get("/api/advice", params={"hours": 0})).status_code == 422
+
+
+async def test_config_publishes_the_asset_universe(client: httpx.AsyncClient) -> None:
+    """The UI shows names, not tickers, and should not own that mapping."""
+    body = (await client.get("/api/config")).json()
+
+    assert len(body["assets"]) == len(body["symbols"])
+    assert {"symbol": "BTC/USD"}.items() <= body["assets"][0].items()
+    assert body["shorting_available"] is False
+
+
+async def test_events_merge_every_source(client: httpx.AsyncClient) -> None:
+    await seed(client)
+
+    body = (await client.get("/api/events")).json()
+
+    assert {item["kind"] for item in body} == {"advice", "news"}
+    stamps = [item["timestamp"] for item in body]
+    assert stamps == sorted(stamps, reverse=True)
+
+
+async def test_events_can_be_filtered_by_symbol(client: httpx.AsyncClient) -> None:
+    await seed(client)
+
+    body = (await client.get("/api/events", params={"symbol": "ETH/USD"})).json()
+
+    assert body
+    assert all("ETH/USD" in item["symbols"] for item in body)
+
+
+async def test_portfolio_is_null_before_the_first_snapshot(client: httpx.AsyncClient) -> None:
+    response = await client.get("/api/portfolio")
+
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+async def test_portfolio_returns_the_latest_snapshot(client: httpx.AsyncClient) -> None:
+    await seed_portfolio(client)
+
+    body = (await client.get("/api/portfolio")).json()
+
+    assert body["equity"] == "100000"
+    assert body["positions"] == []
+
+
+async def test_plan_is_404_without_advice(client: httpx.AsyncClient) -> None:
+    assert (await client.get("/api/plan", params={"symbol": "BTC/USD"})).status_code == 404
+
+
+async def test_plan_is_409_without_enough_price_history(client: httpx.AsyncClient) -> None:
+    await seed(client)
+    await seed_portfolio(client)
+
+    response = await client.get("/api/plan", params={"symbol": "BTC/USD"})
+
+    assert response.status_code == 409
+    assert "price history" in response.json()["detail"]
+
+
+async def test_plan_is_409_without_an_account_snapshot(client: httpx.AsyncClient) -> None:
+    await seed(client)
+    await seed_history(client)
+
+    response = await client.get("/api/plan", params={"symbol": "BTC/USD"})
+
+    assert response.status_code == 409
+    assert "account snapshot" in response.json()["detail"]
+
+
+async def test_plan_sizes_against_the_account(client: httpx.AsyncClient) -> None:
+    await seed(client)
+    await seed_history(client)
+    await seed_portfolio(client)
+
+    body = (await client.get("/api/plan", params={"symbol": "BTC/USD"})).json()
+
+    assert body["symbol"] == "BTC/USD"
+    assert Decimal(body["quantity"]) > 0
+    assert Decimal(body["stop"]) < Decimal(body["price"]) < Decimal(body["target"])
+    assert body["shortable"] is False

@@ -224,3 +224,267 @@ body {
 .news a:hover {
   text-decoration: underline;
 }
+
+/* --- event stream + trade plan --- */
+
+.app {
+  max-width: 1400px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.account {
+  display: flex;
+  gap: 24px;
+  margin: 0;
+}
+
+.account div {
+  display: grid;
+  gap: 2px;
+}
+
+.account dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.account dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+
+.stream-panel {
+  max-height: 78vh;
+  overflow-y: auto;
+}
+
+.stream {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.stream-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+}
+
+.stream-item:hover:not(:disabled) {
+  border-color: #2b3242;
+  background: #161a23;
+}
+
+.stream-item.selected {
+  border-color: var(--up);
+  background: #141b1a;
+}
+
+.stream-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.stream-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.kind {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+}
+
+.kind-advice {
+  color: var(--up);
+  border-color: rgb(38 163 123 / 40%);
+}
+
+.kind-news {
+  color: #6ea8fe;
+  border-color: rgb(110 168 254 / 40%);
+}
+
+.kind-social {
+  color: #c792ea;
+  border-color: rgb(199 146 234 / 40%);
+}
+
+.direction.buy {
+  color: var(--up);
+}
+
+.direction.sell {
+  color: var(--down);
+}
+
+.stream-meta .time {
+  margin-left: auto;
+}
+
+.stream-title {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.stream-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.stream-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.tag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  color: var(--text);
+}
+
+.stream-tags .source {
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.detail-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.detail-panel h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.link {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  margin-left: auto;
+}
+
+.plan {
+  display: grid;
+  gap: 12px;
+}
+
+.plan-action {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.plan-action.buy,
+.plan-action.add {
+  color: var(--up);
+  border-color: rgb(38 163 123 / 45%);
+  background: rgb(38 163 123 / 8%);
+}
+
+.plan-action.exit,
+.plan-action.reduce {
+  color: var(--down);
+  border-color: rgb(217 83 79 / 45%);
+  background: rgb(217 83 79 / 8%);
+}
+
+.plan-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.plan-figures dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.plan-figures dd {
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+.plan-figures .up {
+  color: var(--up);
+}
+
+.plan-figures .down {
+  color: var(--down);
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.plan-holding {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.plan-notes {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12.5px;
+  display: grid;
+  gap: 3px;
+}
+
+.disclaimer {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}

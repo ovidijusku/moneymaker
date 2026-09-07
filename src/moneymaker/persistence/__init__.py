@@ -7,6 +7,7 @@ from moneymaker.persistence.engine import (
 )
 from moneymaker.persistence.repository import (
     latest_bar_timestamp,
+    latest_portfolio,
     load_advice,
     load_bars,
     load_news,
@@ -15,6 +16,7 @@ from moneymaker.persistence.repository import (
     store_advice,
     store_bars,
     store_news,
+    store_portfolio,
     store_posts,
     store_sentiment,
 )
@@ -24,6 +26,7 @@ __all__ = [
     "create_schema",
     "create_session_factory",
     "latest_bar_timestamp",
+    "latest_portfolio",
     "load_advice",
     "load_bars",
     "load_news",
@@ -32,6 +35,7 @@ __all__ = [
     "store_advice",
     "store_bars",
     "store_news",
+    "store_portfolio",
     "store_posts",
     "store_sentiment",
 ]
