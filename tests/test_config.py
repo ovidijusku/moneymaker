@@ -86,7 +86,9 @@ def test_unknown_setting_is_rejected() -> None:
         make_settings(totally_unknown="x")
 
 
-def test_get_settings_reads_environment_and_caches(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_settings_reads_environment_and_caches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("ALPACA_API_KEY", "key")
     monkeypatch.setenv("ALPACA_API_SECRET", SENTINEL_SECRET)
 

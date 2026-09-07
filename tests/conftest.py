@@ -4,7 +4,15 @@ import pytest
 
 from moneymaker.config import get_settings
 
-_ENV_PREFIXES = ("ALPACA_", "REDDIT_", "TRADING_", "DATABASE_", "ENABLE_", "SYMBOLS", "RSS_")
+_ENV_PREFIXES = (
+    "ALPACA_",
+    "REDDIT_",
+    "TRADING_",
+    "DATABASE_",
+    "ENABLE_",
+    "SYMBOLS",
+    "RSS_",
+)
 
 
 @pytest.fixture(autouse=True)

@@ -5,7 +5,13 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from moneymaker.domain import ContentSource, NewsEvent, SentimentScore, SocialPost, content_id
+from moneymaker.domain import (
+    ContentSource,
+    NewsEvent,
+    SentimentScore,
+    SocialPost,
+    content_id,
+)
 
 NOW = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 
