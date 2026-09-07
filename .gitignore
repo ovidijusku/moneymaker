@@ -11,6 +11,9 @@ dist/
 build/
 *.egg-info/
 
+node_modules/
+web/dist/
+
 # Secrets and local state — never commit
 .env
 .env.*

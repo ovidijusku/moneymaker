@@ -1,0 +1,72 @@
+name: moneymaker
+
+x-backend: &backend
+  build:
+    context: .
+  env_file: .env
+  environment:
+    # Overrides the sqlite default in .env; compose runs against Postgres.
+    DATABASE_URL: postgresql+asyncpg://moneymaker:${POSTGRES_PASSWORD:-moneymaker}@db:5432/moneymaker
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: moneymaker
+      # Override by exporting POSTGRES_PASSWORD in your shell, not in .env --
+      # the app parses .env strictly and rejects keys it does not own.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-moneymaker}
+      POSTGRES_DB: moneymaker
+    # Loopback only: this password is a local convenience, not a secret.
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moneymaker -d moneymaker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    command:
+      - uvicorn
+      - moneymaker.api:create_app
+      - --factory
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "moneymaker"]
+
+  web:
+    build:
+      context: ./web
+    ports:
+      - "127.0.0.1:5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

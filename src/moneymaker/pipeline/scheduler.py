@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import signal
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any
 
@@ -23,6 +23,10 @@ log = structlog.get_logger(__name__)
 # Overlapping polls would stack up behind a slow API, so each job runs alone.
 _JOB_DEFAULTS = {"max_instances": 1, "coalesce": True, "misfire_grace_time": 30}
 
+# On a cold start the advice job would otherwise race the backfill, find no bars,
+# and then sit idle for a whole interval before trying again.
+_ADVICE_STARTUP_DELAY = timedelta(seconds=20)
+
 
 def build_scheduler(
     settings: Settings,
@@ -35,7 +39,8 @@ def build_scheduler(
     scheduler = AsyncIOScheduler(timezone="UTC")
     # Without this the first poll would not land until a full interval elapsed,
     # leaving a cold start with an empty database.
-    defaults = {**_JOB_DEFAULTS, "next_run_time": datetime.now(tz=UTC)}
+    start = datetime.now(tz=UTC)
+    defaults = {**_JOB_DEFAULTS, "next_run_time": start}
 
     scheduler.add_job(
         partial(
@@ -84,7 +89,7 @@ def build_scheduler(
         "interval",
         seconds=settings.advice_poll_seconds,
         id="advice",
-        **defaults,
+        **{**defaults, "next_run_time": start + _ADVICE_STARTUP_DELAY},
     )
     return scheduler
 
